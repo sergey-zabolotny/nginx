@@ -5,7 +5,7 @@ NGINX_VER ?= 1.15.6
 NGINX_MINOR_VER ?= $(shell echo "${NGINX_VER}" | grep -oE '^[0-9]+\.[0-9]+')
 TAG ?= $(NGINX_MINOR_VER)
 
-REPO = wodby/nginx
+REPO = sergey-zabolotny/nginx
 NAME = nginx-$(NGINX_MINOR_VER)
 
 ifneq ($(STABILITY_TAG),)

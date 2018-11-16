@@ -1,25 +1,39 @@
-FROM wodby/alpine:3.8-2.1.1
+FROM alpine:3.8
 
 ARG NGINX_VER
 
+# Configure environment variables
 ENV NGINX_VER="${NGINX_VER}" \
     NGINX_UP_VER="0.9.1" \
     MOD_PAGESPEED_VER=1.13.35.2 \
     NGX_PAGESPEED_VER=1.13.35.2 \
     APP_ROOT="/var/www/html" \
     FILES_DIR="/mnt/files" \
-    NGINX_VHOST_PRESET="html"
+    NGINX_VHOST_PRESET="html" \
+    NGINX_BACKEND_HOST="cli" \
+    NGINX_BACKEND_PORT="9000" \
+    DEBUG=1
+
+COPY bin /usr/local/bin/
 
 RUN set -ex; \
     \
+    apk add --update --no-cache \
+        bash \
+        ca-certificates \
+        curl \
+        gzip \
+        tar \
+        unzip \
+        openssl \
+        wget; \
+    \
+    # Install gotpl tool.
+    gotpl_url="https://github.com/wodby/gotpl/releases/download/0.1.5/gotpl-alpine-linux-amd64-0.1.5.tar.gz"; \
+    wget -qO- "${gotpl_url}" | tar xz -C /usr/local/bin; \
+
     addgroup -S nginx; \
     adduser -S -D -H -h /var/cache/nginx -s /sbin/nologin -G nginx nginx; \
-    \
-	addgroup -g 1000 -S wodby; \
-	adduser -u 1000 -D -S -s /bin/bash -G wodby wodby; \
-	sed -i '/^wodby/s/!/*/' /etc/shadow; \
-	echo "PS1='\w\$ '" >> /home/wodby/.bashrc; \
-    \
     apk add --update --no-cache -t .tools \
         findutils \
         make \
@@ -122,7 +136,7 @@ RUN set -ex; \
     make -j$(getconf _NPROCESSORS_ONLN); \
     make install; \
     \
-    install -g wodby -o wodby -d \
+    install -g nginx -o nginx -d \
         "${APP_ROOT}" \
         "${FILES_DIR}" \
         /etc/nginx/conf.d \
@@ -130,7 +144,7 @@ RUN set -ex; \
         /var/lib/nginx; \
     \
     touch /etc/nginx/upstream.conf; \
-    chown -R wodby:wodby /etc/nginx; \
+    chown -R nginx:nginx /etc/nginx; \
     \
     install -g nginx -o nginx -d \
         /var/cache/ngx_pagespeed \
@@ -151,29 +165,24 @@ RUN set -ex; \
 	apk add --no-cache --virtual .nginx-rundeps $runDeps; \
     \
     # Script to fix volumes permissions via sudo.
-    echo "find ${APP_ROOT} ${FILES_DIR} -maxdepth 0 -uid 0 -type d -exec chown wodby:wodby {} +" > /usr/local/bin/init_volumes; \
+    echo "find ${APP_ROOT} ${FILES_DIR} -maxdepth 0 -uid 0 -type d -exec chown nginx:nginx {} +" > /usr/local/bin/init_volumes; \
     chmod +x /usr/local/bin/init_volumes; \
     \
-    { \
-        echo -n 'wodby ALL=(root) NOPASSWD:SETENV: ' ; \
-        echo -n '/usr/local/bin/init_volumes, ' ; \
-        echo '/usr/sbin/nginx' ; \
-    } | tee /etc/sudoers.d/wodby; \
-    \
-    chown wodby:wodby /usr/share/nginx/html/50x.html; \
+    chown nginx:nginx /usr/share/nginx/html/50x.html; \
     # Cleanup
     apk del --purge .nginx-build-deps; \
     rm -rf /tmp/*; \
     rm -rf /var/cache/apk/*
 
-USER wodby
-
-COPY bin /usr/local/bin
 COPY templates /etc/gotpl/
-COPY docker-entrypoint.sh /
+COPY httpd-foreground /usr/local/bin/
+COPY healthcheck.sh /opt/healthcheck.sh
 
-WORKDIR $APP_ROOT
-EXPOSE 80
+WORKDIR /var/www
 
-ENTRYPOINT ["/docker-entrypoint.sh"]
-CMD ["sudo", "nginx"]
+EXPOSE 80 443
+
+CMD ["docker-entrypoint.sh"]
+
+# Health check script
+HEALTHCHECK --interval=5s --timeout=1s --retries=12 CMD ["/opt/healthcheck.sh"]
