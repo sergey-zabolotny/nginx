@@ -22,6 +22,4 @@ location / {
     }
 
     index {{ $index }};
-
-    try_files $uri $uri/ /{{ $index }} =404;
 }
