@@ -10,5 +10,5 @@ env:
     - NGINX_VER=1.13.12 TAGS=1.13
 
 script:
-  - make && make test
+  - make
 
