@@ -12,3 +12,6 @@ env:
 script:
   - make
 
+after_success:
+  - . "${TRAVIS_BUILD_DIR}/release.sh"
+
