@@ -175,7 +175,7 @@ RUN set -ex; \
     rm -rf /var/cache/apk/*
 
 COPY templates /etc/gotpl/
-COPY httpd-foreground /usr/local/bin/
+COPY docker-entrypoint.sh /usr/local/bin/
 COPY healthcheck.sh /opt/healthcheck.sh
 
 WORKDIR /var/www
